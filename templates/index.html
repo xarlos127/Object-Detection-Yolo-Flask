@@ -8,42 +8,92 @@
 </head>
 <body>
     <div class="container">
-        <h1>Upload an Image to Apply Object Detection</h1>
+        <h1>Image Object Detection</h1>
         <form id="upload-form" action="/object-detection/" method="post" enctype="multipart/form-data">
             <label for="image">Select Image:</label>
             <input type="file" id="image" name="image" accept="image/*" required><br><br>
-            <input type="submit" value="Upload and Apply Detection">
         </form>
         <br>
         <h2>Output Image:</h2>
         <img id="output-image" src="" alt="Processed Image">
-        <br>
-        <a id="download-link" href="" download="output.png">Download Image</a>
+        <div id="analysis"></div>
+    </div>
+
+    <div>
+        <!-- Search Image -->
+        <h2>Search Image:</h2>
+        <form id="search-form" action="/search/" method="post" enctype="multipart/form-data">
+            <label for="search-image">Select Image:</label>
+            <input type="file" id="search-image" name="search-image" accept="image/*" required><br><br>
+        </form>
     </div>
 
     <script>
-        document.getElementById('upload-form').onsubmit = async function(event) {
-            event.preventDefault();
+        const fileInput = document.getElementById('image');
+        const form = document.getElementById('upload-form');
+        const searchFileInput = document.getElementById('search-image');
+        const searchForm = document.getElementById('search-form');
 
-            const formData = new FormData(event.target);
-            const response = await fetch('/object-detection/', {
-                method: 'POST',
-                body: formData
-            });
+        fileInput.addEventListener('change', async function() {
+            if (fileInput.files.length > 0) {
+                const formData = new FormData();
+                formData.append('image', fileInput.files[0]); // Add the file manually to FormData
 
-            if (response.ok) {
-                const blob = await response.blob();
-                const url = URL.createObjectURL(blob);
+                console.log("Uploading file:", fileInput.files[0]); // Debug log
 
-                const outputImage = document.getElementById('output-image');
-                outputImage.src = url;
+                const response = await fetch('/object-detection/', {
+                    method: 'POST',
+                    body: formData
+                });
 
-                const downloadLink = document.getElementById('download-link');
-                downloadLink.href = url;
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log("Response data:", data); // Debug log
+
+                    // Display the processed image
+                    const outputImage = document.getElementById('output-image');
+                    outputImage.src = `data:image/png;base64,${data.image}`;
+
+                    // Display detected objects
+                    const analysis = document.getElementById('analysis');
+                    analysis.innerHTML = `<h3>Detected Objects:</h3><ul>${data.detected_objects.map(obj => `<li>${obj}</li>`).join('')}</ul>`;
+                } else {
+                    console.error('Failed to process image');
+                }
             } else {
-                console.error('Failed to process image');
+                console.error('No file selected');
             }
-        };
+        });
+        searchFileInput.addEventListener('change', async function() {
+            if (searchFileInput.files.length > 0) {
+                const formData = new FormData(searchForm);
+                const response = await fetch('/search/', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log("Search Response data:", data); // Debug log
+                    const clearImages = document.getElementsByClassName('processed-image');
+                    while (clearImages.length > 0) {
+                        clearImages[0].parentNode.removeChild(clearImages[0]);
+                    }
+
+                    // Display detected objects
+                    data.images.forEach((image, index) => {
+                        const imgElement = document.createElement('img');
+                        imgElement.src = `/images/${image}`;
+                        imgElement.alt = `Processed Image ${index + 1}`;
+                        imgElement.style.width = '200px'; // Set a fixed width for the images
+                        imgElement.className = 'processed-image'; // Add a class for styling
+                        document.body.appendChild(imgElement);
+                    });
+                } else {
+                    console.error('Failed to process image');
+                }
+            }
+        });
     </script>
 </body>
 </html>
