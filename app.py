@@ -99,13 +99,10 @@ def search_images():
     img = process_image(file)
     results = model.predict(img, conf=0.5)
     annotated_img, detected_objects = annotate_image(img, results)
-    
-    # Search for images with detected objects in the database
     query = Query()
-    images = db.search(query.image_keywords.any(detected_objects))
-    if not images:
-        return jsonify({"error": "No images found"}), 404
-    
+    # Run detection on the uploaded image
+    # Search for images with detected objects in the database
+    images = db.search(query.image_keywords.any(detected_objects)) # this should be a list of images that match the detected objects
     return jsonify({"images": [img['file_name'] for img in images]})
 
 

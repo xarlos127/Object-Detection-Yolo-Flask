@@ -3,97 +3,283 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Object Detection Application</title>
-    <link rel="stylesheet" href="/static/style.css">
+    <title>Modern Object Detection Application</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/lucide@latest"></script>
+    <style>
+        /* Optional: Custom styles if needed, but prefer Tailwind */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
 </head>
-<body>
-    <div class="container">
-        <h1>Image Object Detection</h1>
-        <form id="upload-form" action="/object-detection/" method="post" enctype="multipart/form-data">
-            <label for="image">Select Image:</label>
-            <input type="file" id="image" name="image" accept="image/*" required><br><br>
-        </form>
-        <br>
-        <h2>Output Image:</h2>
-        <img id="output-image" src="" alt="Processed Image">
-        <div id="analysis"></div>
-    </div>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
+    <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-3xl">
+        <h1 class="text-3xl font-bold text-center text-gray-800 mb-6">Image Object Detection</h1>
 
-    <div>
-        <!-- Search Image -->
-        <h2>Search Image:</h2>
-        <form id="search-form" action="/search/" method="post" enctype="multipart/form-data">
-            <label for="search-image">Select Image:</label>
-            <input type="file" id="search-image" name="search-image" accept="image/*" required><br><br>
-        </form>
+        <div class="mb-8">
+            <h2 class="text-xl font-semibold text-gray-700 mb-4 flex items-center">
+                <i data-lucide="upload-cloud" class="mr-2"></i>
+                Upload Image for Detection
+            </h2>
+            <form id="upload-form" action="/object-detection/" method="post" enctype="multipart/form-data" class="flex flex-col items-center space-y-4">
+                <label for="image" class="w-full text-center py-3 px-6 border border-gray-300 rounded-md cursor-pointer bg-blue-500 text-white hover:bg-blue-600 transition duration-200 ease-in-out">
+                    Select Image
+                </label>
+                <input type="file" id="image" name="image" accept="image/*" required class="hidden">
+                <span id="file-name" class="text-gray-600 italic">No file chosen</span>
+            </form>
+        </div>
+
+        <div id="output-section" class="hidden mb-8">
+            <h2 class="text-xl font-semibold text-gray-700 mb-4 flex items-center">
+                 <i data-lucide="image" class="mr-2"></i>
+                Processed Image & Analysis
+            </h2>
+            <div class="flex flex-col md:flex-row gap-6">
+                <div class="md:w-1/2 flex justify-center">
+                    <img id="output-image" src="" alt="Processed Image" class="rounded-md shadow-md max-h-96 object-contain">
+                </div>
+                <div class="md:w-1/2">
+                    <div id="analysis" class="bg-gray-50 p-4 rounded-md border border-gray-200">
+                        <h3 class="text-lg font-medium text-gray-800 mb-3 flex items-center">
+                             <i data-lucide="list" class="mr-2"></i>
+                            Detected Objects:
+                        </h3>
+                        <ul id="detected-objects-list" class="list-disc list-inside text-gray-700">
+                            </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="search-section" class="hidden mb-8">
+             <h2 class="text-xl font-semibold text-gray-700 mb-4 flex items-center">
+                 <i data-lucide="search" class="mr-2"></i>
+                Search for Matching Images
+            </h2>
+            <form id="search-form" action="/search/" method="post" enctype="multipart/form-data" class="flex flex-col items-center space-y-4">
+                 <label for="search-image" class="w-full text-center py-3 px-6 border border-gray-300 rounded-md cursor-pointer bg-green-500 text-white hover:bg-green-600 transition duration-200 ease-in-out">
+                    Select Image to Search With
+                </label>
+                <input type="file" id="search-image" name="search-image" accept="image/*" required class="hidden">
+                 <span id="search-file-name" class="text-gray-600 italic">No file chosen</span>
+            </form>
+        </div>
+
+        <div id="search-results-section" class="hidden">
+             <h2 class="text-xl font-semibold text-gray-700 mb-4 flex items-center">
+                 <i data-lucide="image-plus" class="mr-2"></i>
+                Matching Images by Object
+            </h2>
+            <div id="search-results">
+                </div>
+        </div>
+
+         <div id="loading-spinner" class="hidden text-center mt-8">
+            <div class="animate-spin inline-block w-8 h-8 border-4 border-blue-500 border-solid rounded-full border-r-transparent"></div>
+            <p class="text-gray-600 mt-2">Processing...</p>
+        </div>
+
+         <div id="error-message" class="hidden text-center mt-8 text-red-500 font-semibold">
+            An error occurred. Please try again.
+        </div>
+
     </div>
 
     <script>
-        const fileInput = document.getElementById('image');
-        const form = document.getElementById('upload-form');
-        const searchFileInput = document.getElementById('search-image');
-        const searchForm = document.getElementById('search-form');
+        // Initialize Lucide icons
+        lucide.createIcons();
 
+        const fileInput = document.getElementById('image');
+        const fileNameSpan = document.getElementById('file-name');
+        const outputSection = document.getElementById('output-section');
+        const outputImage = document.getElementById('output-image');
+        const detectedObjectsList = document.getElementById('detected-objects-list');
+        const searchSection = document.getElementById('search-section');
+
+        const searchFileInput = document.getElementById('search-image');
+        const searchFileNameSpan = document.getElementById('search-file-name');
+        const searchResultsSection = document.getElementById('search-results-section');
+        const searchResultsDiv = document.getElementById('search-results');
+
+        const loadingSpinner = document.getElementById('loading-spinner');
+        const errorMessageDiv = document.getElementById('error-message');
+
+        // Function to show loading spinner
+        function showLoading() {
+            loadingSpinner.classList.remove('hidden');
+            errorMessageDiv.classList.add('hidden');
+            // Keep other sections visible if they were already
+        }
+
+        // Function to hide loading spinner
+        function hideLoading() {
+            loadingSpinner.classList.add('hidden');
+        }
+
+         // Function to show error message
+        function showError() {
+            hideLoading();
+            errorMessageDiv.classList.remove('hidden');
+            // Keep other sections visible if they were already
+        }
+
+
+        // Event listener for the object detection file input
         fileInput.addEventListener('change', async function() {
             if (fileInput.files.length > 0) {
+                const file = fileInput.files[0];
+                fileNameSpan.textContent = file.name; // Display selected file name
+                showLoading(); // Show loading spinner
+                // Hide previous results sections
+                outputSection.classList.add('hidden');
+                searchSection.classList.add('hidden');
+                searchResultsSection.classList.add('hidden');
+
+
                 const formData = new FormData();
-                formData.append('image', fileInput.files[0]); // Add the file manually to FormData
+                formData.append('image', file);
 
-                console.log("Uploading file:", fileInput.files[0]); // Debug log
+                try {
+                    const response = await fetch('/object-detection/', {
+                        method: 'POST',
+                        body: formData
+                    });
 
-                const response = await fetch('/object-detection/', {
-                    method: 'POST',
-                    body: formData
-                });
+                    if (response.ok) {
+                        const data = await response.json();
+                        console.log("Object Detection Response data:", data);
 
-                if (response.ok) {
-                    const data = await response.json();
-                    console.log("Response data:", data); // Debug log
+                        // Display the processed image
+                        outputImage.src = `data:image/png;base64,${data.image}`;
 
-                    // Display the processed image
-                    const outputImage = document.getElementById('output-image');
-                    outputImage.src = `data:image/png;base64,${data.image}`;
+                        // Display detected objects
+                        detectedObjectsList.innerHTML = data.detected_objects.map(obj => `<li>${obj}</li>`).join('');
 
-                    // Display detected objects
-                    const analysis = document.getElementById('analysis');
-                    analysis.innerHTML = `<h3>Detected Objects:</h3><ul>${data.detected_objects.map(obj => `<li>${obj}</li>`).join('')}</ul>`;
-                } else {
-                    console.error('Failed to process image');
+                        // Show the output and search sections
+                        hideLoading();
+                        outputSection.classList.remove('hidden');
+                        searchSection.classList.remove('hidden'); // Show search section after detection
+
+                    } else {
+                        console.error('Failed to process image for object detection');
+                        showError(); // Show error message
+                    }
+                } catch (error) {
+                    console.error('Error during object detection fetch:', error);
+                    showError(); // Show error message
                 }
             } else {
-                console.error('No file selected');
+                fileNameSpan.textContent = 'No file chosen';
+                 outputSection.classList.add('hidden');
+                 searchSection.classList.add('hidden');
+                 searchResultsSection.classList.add('hidden');
+                 errorMessageDiv.classList.add('hidden');
             }
         });
+
+        // Event listener for the image search file input
         searchFileInput.addEventListener('change', async function() {
             if (searchFileInput.files.length > 0) {
-                const formData = new FormData(searchForm);
-                const response = await fetch('/search/', {
-                    method: 'POST',
-                    body: formData
-                });
+                const file = searchFileInput.files[0];
+                searchFileNameSpan.textContent = file.name; // Display selected file name
+                showLoading(); // Show loading spinner
+                 // Hide previous search results
+                searchResultsSection.classList.add('hidden');
 
-                if (response.ok) {
-                    const data = await response.json();
-                    console.log("Search Response data:", data); // Debug log
-                    const clearImages = document.getElementsByClassName('processed-image');
-                    while (clearImages.length > 0) {
-                        clearImages[0].parentNode.removeChild(clearImages[0]);
-                    }
 
-                    // Display detected objects
-                    data.images.forEach((image, index) => {
-                        const imgElement = document.createElement('img');
-                        imgElement.src = `/images/${image}`;
-                        imgElement.alt = `Processed Image ${index + 1}`;
-                        imgElement.style.width = '200px'; // Set a fixed width for the images
-                        imgElement.className = 'processed-image'; // Add a class for styling
-                        document.body.appendChild(imgElement);
+                const formData = new FormData();
+                formData.append('search-image', file);
+
+                try {
+                    const response = await fetch('/search/', {
+                        method: 'POST',
+                        body: formData
                     });
-                } else {
-                    console.error('Failed to process image');
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        console.log("Search Response data:", data);
+
+                        // Clear previous search results
+                        searchResultsDiv.innerHTML = '';
+
+                        // Display matching images grouped by object
+                        if (data.results && data.results.length > 0) {
+                             data.results.forEach(result => {
+                                 // Create a heading for the object name
+                                 const objectHeading = document.createElement('h3');
+                                 objectHeading.className = 'text-lg font-medium text-gray-800 mt-4 mb-2';
+                                 objectHeading.textContent = result.object;
+                                 searchResultsDiv.appendChild(objectHeading);
+
+                                 // Create a container for the images for this object
+                                 const imagesContainer = document.createElement('div');
+                                 imagesContainer.className = 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-6'; // Responsive grid for images
+
+                                 if (result.images && result.images.length > 0) {
+                                     result.images.forEach(imageName => {
+                                        const imgElement = document.createElement('img');
+                                        // Assuming images are served from a /images/ static directory
+                                        imgElement.src = `/images/${imageName}`;
+                                        imgElement.alt = `Matching Image: ${imageName}`;
+                                        imgElement.className = 'rounded-md shadow-sm object-cover w-full h-32 md:h-40 lg:h-48'; // Responsive image size
+                                        imagesContainer.appendChild(imgElement);
+                                    });
+                                 } else {
+                                      const noImagesText = document.createElement('p');
+                                      noImagesText.className = 'text-gray-600 col-span-full';
+                                      noImagesText.textContent = `No matching images found for ${result.object}.`;
+                                      imagesContainer.appendChild(noImagesText);
+                                 }
+
+                                 searchResultsDiv.appendChild(imagesContainer);
+                            });
+                        } else {
+                             searchResultsDiv.innerHTML = '<p class="text-gray-600 col-span-full text-center">No matching images found.</p>';
+                        }
+
+
+                        // Show the search results section
+                        hideLoading();
+                        searchResultsSection.classList.remove('hidden');
+                         // Keep output and search sections visible if they were already
+                         if (!outputSection.classList.contains('hidden')) {
+                             outputSection.classList.remove('hidden');
+                         }
+                         if (!searchSection.classList.contains('hidden')) {
+                             searchSection.classList.remove('hidden');
+                         }
+
+
+                    } else {
+                        console.error('Failed to process image for search');
+                        showError(); // Show error message
+                    }
+                } catch (error) {
+                     console.error('Error during search fetch:', error);
+                    showError(); // Show error message
                 }
+            } else {
+                searchFileNameSpan.textContent = 'No file chosen';
+                 searchResultsSection.classList.add('hidden');
+                 errorMessageDiv.classList.add('hidden');
+                 // Keep output and search sections visible if they were already
+                 if (!outputSection.classList.contains('hidden')) {
+                     outputSection.classList.remove('hidden');
+                 }
+                 if (!searchSection.classList.contains('hidden')) {
+                     searchSection.classList.remove('hidden');
+                 }
             }
         });
+
+         // Initial state: hide output and search sections
+        outputSection.classList.add('hidden');
+        searchSection.classList.add('hidden');
+        searchResultsSection.classList.add('hidden');
+
     </script>
 </body>
 </html>
